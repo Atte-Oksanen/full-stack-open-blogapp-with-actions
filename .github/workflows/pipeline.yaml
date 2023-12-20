@@ -1,0 +1,57 @@
+name: Deployment pipeline
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize]
+
+jobs:
+  deploy:
+    if: ${{ github.event_name == 'push' }}
+    name: Deploy to Render
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger backend deployment
+        run: curl ${{ secrets.RENDER_API_KEY_BACKEND }}
+      - name: Trigger frontend deployment
+        run: curl ${{ secrets.RENDER_API_KEY }}
+  tag_release:
+    needs: [deploy]
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: "0"
+
+      - name: Bump version and push tag
+        uses: anothrNick/github-tag-action@1.64.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WITH_V: true
+          PRERELEASE: true
+          DEFAULT_BUMP: patch
+  discord_message:
+    needs: [tag_release, deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pipeline Success
+        uses: rjstone/discord-webhook-notify@v1
+        if: ${{ success() }}
+        with:
+          severity: info
+          details: Pipeline Succeeded!
+          webhookUrl: ${{ secrets.DISCORD_WEBHOOK }}
+      - name: Pipeline Failure
+        uses: rjstone/discord-webhook-notify@v1
+        if: ${{ failure() }}
+        with:
+          severity: error
+          details: Pipeline Failed!
+          webhookUrl: ${{ secrets.DISCORD_WEBHOOK }}
