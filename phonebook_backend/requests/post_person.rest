@@ -1,0 +1,7 @@
+POST https://person-test.onrender.com/api/persons/ HTTP/1.1
+content-type: application/json
+
+{
+    "name": "Emeritus",
+    "number": "040123321"
+}
